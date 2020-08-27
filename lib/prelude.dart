@@ -3,7 +3,4 @@
 /// More dartdocs go here.
 library prelude;
 
-export 'src/accidental.dart';
-export 'src/prelude_base.dart';
-
-// TODO: Export any libraries intended for clients of this package.
+export 'src/pitch.dart';

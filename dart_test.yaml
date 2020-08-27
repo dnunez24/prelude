@@ -1,0 +1,10 @@
+reporter: expanded
+presets:
+  ci:
+    reporter: expanded
+    file_reporters:
+      json: reports/tests.json
+    tags:
+      unit:
+      integration:
+        timeout: 10s
