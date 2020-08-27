@@ -12,7 +12,7 @@ void main() {
       expect(Accidental.doubleSharp, same(Accidental.doubleSharp));
     });
 
-    test('.name returns the text name of the accidental', () {
+    test('.name returns the accidental name as text', () {
       expect(Accidental.doubleFlat.name, 'doubleFlat');
       expect(Accidental.flat.name, 'flat');
       expect(Accidental.natural.name, 'natural');
@@ -28,7 +28,7 @@ void main() {
       expect(Accidental.doubleSharp.symbol, '𝄪');
     });
 
-    test('.values returns a set of all the constants', () {
+    test('.values returns a set of all the available accidentals', () {
       final values = {
         Accidental.doubleFlat,
         Accidental.flat,
@@ -48,7 +48,7 @@ void main() {
       expect(Accidental.doubleSharp.toString(), 'Accidental(doubleSharp)');
     });
 
-    test('.valueOf() returns the constant matching the string name', () {
+    test('.valueOf() returns the accidental matching the string name', () {
       expect(Accidental.valueOf('doubleFlat'), Accidental.doubleFlat);
       expect(Accidental.valueOf('flat'), Accidental.flat);
       expect(Accidental.valueOf('natural'), Accidental.natural);
