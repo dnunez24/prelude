@@ -33,7 +33,8 @@ abstract class ValueInRange<T extends num> extends Equatable {
 
   void _validate(T value) {
     if (value < _minValue || value > _maxValue) {
-      throw RangeError.range(value, _minValue.toInt(), _maxValue.toInt(), 'value');
+      throw RangeError.range(
+          value, _minValue.toInt(), _maxValue.toInt(), 'value');
     }
   }
 }
@@ -352,6 +353,34 @@ class PitchClass {
   //   throw UnimplementedError();
   // }
 
+  fromSemitones(int semitones) {
+    // var map = {
+    //   aNatural: 0,
+    //   aSharp: 1,
+    //   bFlat: 1,
+    //   bNatural: 2,
+    //   cFlat: 2,
+    //   bSharp: 3,
+    //   cNatural: 3,
+    //   cSharp: 4,
+    //   dFlat: 4,
+    //   dNatural: 5,
+    //   dSharp: 6,
+    //   eFlat: 6,
+    //   eNatural: 7,
+    //   aFlat: 11,
+    // };
+  }
+
+  static List<PitchClass> get values => List.unmodifiable([
+    cNatural,
+    cSharp,
+  ]);
+
+  static PitchClass valueOf(String name) {
+    // TODO: implement me
+  }
+
   PitchClass enharmonicEquivalent() {
     final enharmonicNotes = {
       aFlat: gSharp,
@@ -377,4 +406,8 @@ class PitchClass {
     };
     return enharmonicNotes[this] ?? this;
   }
+
+  PitchClass operator +(Interval interval) {}
+
+  PitchClass operator -(Interval interval) {}
 }
