@@ -1,6 +1,9 @@
 import 'dart:math' show log, pow;
 import 'package:equatable/equatable.dart';
 import 'package:meta/meta.dart';
+import 'package:prelude/prelude.dart';
+import 'interval.dart';
+import 'pitch_spelling.dart';
 
 @immutable
 abstract class ValueInRange<T extends num> extends Equatable {
@@ -102,6 +105,8 @@ class Octave extends ValueInRange<int> with EquatableMixin {
   /// Creates a new [Octave] with the given number.
   const Octave(this._number) : super(_number, _minimum, _maximum);
 
+  Octave.fromFrequency(Frequency frequency) {}
+
   // Octave.fromNoteNumber(NoteNumber noteNumber) {
   //   throw UnimplementedError();
   // }
@@ -116,36 +121,50 @@ class Octave extends ValueInRange<int> with EquatableMixin {
   @override
   bool get stringify => true;
 
-  /// Converts this [Octave] into a [NoteNumber].
-  NoteNumber toNoteNumber() => NoteNumber((_number + 1) * semitones);
+  /// Converts this [Octave] into a [MidiNote].
+  MidiNote toNoteNumber() => MidiNote((_number + 1) * semitones);
 }
 
 /// A frequency
 @immutable
 class Frequency extends ValueInRange<double> with EquatableMixin {
   /// The standard tuning frequency, also known as [A440](https://en.wikipedia.org/wiki/A440_(pitch_standard)).
-  static const iso16TuningPitch = Frequency(440.0);
+  static const iso16TuningFrequency = Frequency(440.0);
   static const double _minimum = 0.0;
   static const double _maximum = 22050.0;
 
   /// Creates a new [Frequency] from a given value.
   const Frequency(double value) : super(value, _minimum, _maximum);
 
-  /// Creates a new [Frequency] from a given [NoteNumber].
-  factory Frequency.fromNoteNumber(NoteNumber noteNumber,
-      {Frequency tuningPitch}) {
-    final tuningPitchNoteNumber = NoteNumber.iso16tuningPitch;
-    final actualTuningPitch = tuningPitch ?? Frequency.iso16TuningPitch;
+  Frequency.fromPitchAttributes(NoteName noteName, Octave octave,
+      {Frequency tuningFrequency = iso16TuningFrequency}) {
+    var octaveDivision = 12;
+    var semitoneHz = pow(2, 1 / octaveDivision);
+    // var semitoneStepsCount = UnorderedPitchInterval.between(pitch1, pitch2);
+    const referencePitchClass = PitchClass.aNatural;
+    const referenceOctave = Octave(4);
+    var referencePitch = Pitch(referencePitchClass, referenceOctave);
+    var givenPitch = PitchClass.fromPitchAttributes(noteName, octave);
+    var semitoneStepsCount =
+        UnorderedPitchInterval.between(pitch1, referencePitch);
+    var frequency = tuningFrequency * pow(semitoneHz, semitoneStepsCount);
+  }
+
+  /// Creates a new [Frequency] from a given [MidiNote].
+  factory Frequency.fromMidiNote(MidiNote midiNote,
+      {Frequency tuningFrequency}) {
+    final tuningPitchNoteNumber = MidiNote.iso16tuningPitch;
+    final actualTuningPitch = tuningFrequency ?? Frequency.iso16TuningPitch;
     final frequencyValue = pow(
             2.0,
-            (noteNumber.toDouble() - tuningPitchNoteNumber.toDouble()) /
+            (midiNote.toDouble() - tuningPitchNoteNumber.toDouble()) /
                 Octave.semitones) *
         actualTuningPitch.toDouble();
     return Frequency(frequencyValue);
   }
 
-  /// Convert this [Frequency] into a [NoteNumber].
-  NoteNumber toNoteNumber() => NoteNumber.fromFrequency(this);
+  /// Convert this [Frequency] into a [MidiNote].
+  MidiNote toMidiNote() => MidiNote.fromFrequency(this);
 
   /// Adds the value of two [Frequency] values together and returns a new
   /// [Frequency].
@@ -207,34 +226,45 @@ class NoteName extends Equatable {
 /// A note number in the pitch spectrum corresponding to the allowed
 /// FiniteRange of [Octave]s. Matches the MIDI spec for note numbers, for example,
 /// C-1 == 0.
-class NoteNumber extends ValueInRange<int> {
+class MidiNote {
   /// The note number corresponding to middle C on a standard piano keyboard.
-  static const NoteNumber middleC = NoteNumber(60);
+  static const MidiNote middleC = MidiNote(60, 0);
 
-  /// The ISO 16 standard tuning pitch [NoteNumber], perhaps better known as A4
+  /// The ISO 16 standard tuning pitch [MidiNote], perhaps better known as A4
   /// or the A above middle C on a piano keyboard.
-  static const iso16tuningPitch = NoteNumber(69);
+  static const iso16tuningPitch = MidiNote(69, 0);
 
   static const int _minimum = 0;
+
   static const int _maximum = 127;
 
-  /// Creates a new [NoteNumber] from a given value.
-  const NoteNumber(int value) : super(value, _minimum, _maximum);
+  final int number;
+
+  final int cents;
+
+  final int semitoneFraction;
+
+  /// Creates a new [MidiNote] from a given value.
+  const MidiNote(this.number, this.cents)
+      : assert(cents >= 0),
+        assert(cents <= 100),
+        assert(number >= 0),
+        assert(number <= 127);
+  // super(number, _minimum, _maximum);
 
   /// Creates a [NoteNumber] from a [Frequency], with option to use an
   /// alternative tuning pitch (default is [TuningPitch.A_440] or A above middle
   /// C == 440Hz).
-  factory NoteNumber.fromFrequency(Frequency frequency,
-      {Frequency tuningPitch}) {
+  factory MidiNote.fromFrequency(Frequency frequency, {Frequency tuningPitch}) {
     final actualTuningPitch = tuningPitch ?? Frequency.iso16TuningPitch;
-    final tuningPitchNoteNumber = NoteNumber.iso16tuningPitch.toInt();
+    final tuningPitchNoteNumber = MidiNote.iso16tuningPitch.toInt();
     final tuningRatio = frequency.toDouble() / actualTuningPitch.toDouble();
     final noteValue =
         tuningPitchNoteNumber + Octave.semitones * log(tuningRatio);
-    return NoteNumber(noteValue.round());
+    return MidiNote(noteValue.round());
   }
 
-  /// Converts the [NoteNumber] into a [Frequency].
+  /// Converts the [MidiNote] into a [Frequency].
   Frequency toFrequency({Frequency tuningPitch}) =>
       Frequency.fromNoteNumber(this,
           tuningPitch: tuningPitch ?? Frequency.iso16TuningPitch);
@@ -244,12 +274,56 @@ class NoteNumber extends ValueInRange<int> {
 }
 
 class Pitch {
-  final NoteNumber noteNumber;
+  // TODO: don't make MidiNote part of the innate data for Pitch, make it
+  // something that can be derived from pitch, e.g. via pitch.toMidiNote()
+  // final MidiNote noteNumber;
   final Frequency frequency;
   final PitchClass pitchClass;
   final Octave octave;
+  // TODO: add cents to indicate detuning of note relative to MIDI note number
+  // using 12 tone equal temperment as the basis
+  // should this actually be part of the MIDI note number representation?
+  final int cents;
 
-  const Pitch({this.noteNumber, this.frequency, this.octave, this.pitchClass});
+  // TODO: only pass in frequency to init Pitch and the rest can be derived
+  // see: https://newt.phys.unsw.edu.au/jw/notes.html
+
+  Pitch(this.pitchClass, this.octave)
+      : frequency = Frequency.fromPitchAttributes(pitchClass, octave),
+        cents = 0;
+
+  Pitch.fromFrequency(this.frequency,
+      {Frequency tuningFrequency = Frequency.iso16TuningPitch})
+      : cents =
+            _centsFromFrequency(frequency, tuningFrequency: tuningFrequency),
+        octave = Octave.fromFrequency(frequency),
+        pitchClass = PitchClass.fromFrequency(frequency);
+
+  Pitch.fromMidiNoteNumber(MidiNote midiNoteNumber);
+
+  /// See: https://newt.phys.unsw.edu.au/jw/notes.html
+  // TODO: move this logic into MIDI note number since the MIDI spec accounts
+  // for representing an equal tempered tuning center pitch and it's offset
+  // in cents
+  // Also, rename it to MidiNote since it's not just the number
+  static int _centsFromFrequency(Frequency frequency,
+      {Frequency tuningFrequency}) {
+    const octaveCents = 1200;
+    const octaveFrequencyRatio = 2;
+    var tuningFrequencyRatio =
+        frequency.toDouble() / tuningFrequency.toDouble();
+    var octaveDistance = log(tuningFrequencyRatio) / log(octaveFrequencyRatio);
+    var centsDistance = octaveCents * octaveDistance;
+    var semitoneCentsOffset = centsDistance.round() % 100;
+
+    return semitoneCentsOffset > 25
+        ? 50 - semitoneCentsOffset
+        : semitoneCentsOffset;
+  }
+
+  // double _octaveFromFrequency({Frequency tuningFrequency}) =>
+  //     // log(frequency.toDouble() / tuningFrequency.toDouble());
+  //     Octave.fromFrequency(frequency);
 
   // TODO: implement Pitch.fromNoteNumber()
   // Pitch.fromNoteNumber(this.noteNumber)
@@ -262,6 +336,10 @@ class Pitch {
   //     : noteNumber = NoteNumber.fromFrequency(frequency, tuningPitch: tuningPitch),
   //       octave = Octave.fromFrequency(frequency),
   //       pitchClass = PitchClass.fromFrequency(frequency, tuningPitch: tuningPitch);
+
+  int toInt() => noteNumber.toInt();
+
+  double toDouble() => frequency.toDouble();
 
   /// Returns a new [Pitch] that results from adding the given number of
   /// semitones to this [Pitch].
@@ -298,55 +376,103 @@ class Pitch {
   // }
 }
 
+// TODO: make this an interface or base class
+// with ordered and unordered implementing/inheriting it
+class PitchClassSet {
+  Set<int> pitchClasses;
+
+  get values {
+    //
+  }
+
+  get normalOrder {
+    //
+  }
+
+  get primeOrder {
+    //
+  }
+
+  transpose(int steps) {
+    //
+  }
+
+  invert() {}
+
+  retrograde() {
+    //
+  }
+
+  complement() {}
+
+  rotate(int steps) {
+    //
+  }
+
+  PitchClassSet operator *(int factor) {
+    // this.values.map((pitchClass) => pitchClass * factor);
+    // TODO: quotient must be % 12 to set the value between 1 and 12
+  }
+}
+
 /// Combination of note name and accidental (independent of octave).
-class PitchClass {
-  static const aFlat =
-      PitchClass._(noteName: NoteName.A, accidental: Accidental.flat);
-  static const aNatural =
-      PitchClass._(noteName: NoteName.A, accidental: Accidental.natural);
-  static const aSharp =
-      PitchClass._(noteName: NoteName.A, accidental: Accidental.sharp);
-  static const bFlat =
-      PitchClass._(noteName: NoteName.B, accidental: Accidental.flat);
-  static const bNatural =
-      PitchClass._(noteName: NoteName.B, accidental: Accidental.natural);
-  static const bSharp =
-      PitchClass._(noteName: NoteName.B, accidental: Accidental.sharp);
-  static const cFlat =
-      PitchClass._(noteName: NoteName.C, accidental: Accidental.flat);
-  static const cNatural =
-      PitchClass._(noteName: NoteName.C, accidental: Accidental.natural);
-  static const cSharp =
-      PitchClass._(noteName: NoteName.C, accidental: Accidental.sharp);
-  static const dFlat =
-      PitchClass._(noteName: NoteName.D, accidental: Accidental.flat);
-  static const dNatural =
-      PitchClass._(noteName: NoteName.D, accidental: Accidental.natural);
-  static const dSharp =
-      PitchClass._(noteName: NoteName.D, accidental: Accidental.sharp);
-  static const eFlat =
-      PitchClass._(noteName: NoteName.E, accidental: Accidental.flat);
-  static const eNatural =
-      PitchClass._(noteName: NoteName.E, accidental: Accidental.natural);
-  static const eSharp =
-      PitchClass._(noteName: NoteName.E, accidental: Accidental.sharp);
-  static const fFlat =
-      PitchClass._(noteName: NoteName.F, accidental: Accidental.flat);
-  static const fNatural =
-      PitchClass._(noteName: NoteName.F, accidental: Accidental.natural);
-  static const fSharp =
-      PitchClass._(noteName: NoteName.F, accidental: Accidental.sharp);
-  static const gFlat =
-      PitchClass._(noteName: NoteName.G, accidental: Accidental.flat);
-  static const gNatural =
-      PitchClass._(noteName: NoteName.G, accidental: Accidental.natural);
-  static const gSharp =
-      PitchClass._(noteName: NoteName.G, accidental: Accidental.sharp);
+class PitchClass extends Equatable implements Comparable<PitchClass> {
+  static const bSharp = PitchClass(0);
 
-  final NoteName noteName;
-  final Accidental accidental;
+  static const cNatural = PitchClass(0);
 
-  const PitchClass._({this.noteName, this.accidental});
+  static const cSharp = PitchClass(1);
+
+  static const dFlat = PitchClass(1);
+
+  static const dNatural = PitchClass(2);
+
+  static const dSharp = PitchClass(3);
+
+  static const eFlat = PitchClass(3);
+
+  static const eNatural = PitchClass(4);
+
+  static const fFlat = PitchClass(4);
+
+  static const eSharp = PitchClass(5);
+
+  static const fNatural = PitchClass(5);
+
+  static const fSharp = PitchClass(6);
+
+  static const gFlat = PitchClass(6);
+
+  static const gNatural = PitchClass(7);
+
+  static const gSharp = PitchClass(8);
+
+  static const aFlat = PitchClass(8);
+
+  static const aNatural = PitchClass(9);
+
+  static const aSharp = PitchClass(10);
+
+  static const bFlat = PitchClass(10);
+
+  static const bNatural = PitchClass(11);
+
+  static const cFlat = PitchClass(11);
+
+  final int setNumber;
+
+  // TODO: use a map to lookup the set number from the pitch attributes
+  PitchClass.fromPitchAttributes(NoteName noteName, Accidental accidental);
+
+  const PitchClass(this.setNumber) : assert(setNumber >= 0 && setNumber <= 11);
+
+  PitchClass.fromFrequency(Frequency frequency);
+
+  @override
+  List<Object> get props => [setNumber];
+
+  @override
+  bool get stringify => true;
 
   // TODO: implement PitchClass.fromNoteNumber()
   // PitchClass.fromNoteNumber(NoteNumber noteNumber) {
@@ -372,42 +498,158 @@ class PitchClass {
     // };
   }
 
-  static List<PitchClass> get values => List.unmodifiable([
-    cNatural,
-    cSharp,
-  ]);
+  // List<Set<Interval>> get notes => List.unmodifiable([
+  //       {cNatural, bSharp, dDoubleFlat},
+  //       {cSharp, dFlat, bDoubleSharp, dDoubleFlat},
+  //       {bSharp, cNatural, dDoubleFlat},
+  //       {bSharp, cNatural, dDoubleFlat},
+  //       {bSharp, cNatural, dDoubleFlat},
+  //       {bSharp, cNatural, dDoubleFlat},
+  //       {bSharp, cNatural, dDoubleFlat},
+  //     ]);
+
+  static List<PitchClass> get values => [
+        bSharp,
+        cNatural,
+        dDoubleFlat,
+        bDoubleSharp,
+        cSharp,
+        dFlat,
+        cDoubleSharp,
+        dNatural,
+        eDoubleFlat,
+        dSharp,
+        eFlat,
+        fDoubleFlat,
+        dDoubleSharp,
+        eNatural,
+        fFlat,
+        eSharp,
+        fNatural,
+        gDoubleFlat,
+        eDoubleSharp,
+        fSharp,
+        gFlat,
+        fDoubleSharp,
+        gNatural,
+        aDoubleFlat,
+        gSharp,
+        aFlat,
+        gDoubleSharp,
+        aNatural,
+        bDoubleFlat,
+        aSharp,
+        bFlat,
+        cDoubleFlat,
+        aDoubleSharp,
+        bNatural,
+        cFlat,
+      ];
 
   static PitchClass valueOf(String name) {
     // TODO: implement me
   }
 
-  PitchClass enharmonicEquivalent() {
-    final enharmonicNotes = {
-      aFlat: gSharp,
-      // aNatural is itself
-      aSharp: bFlat,
-      bFlat: aSharp,
-      bNatural: cFlat,
-      bSharp: cNatural,
-      cFlat: bNatural,
-      cNatural: bSharp,
-      cSharp: dFlat,
-      dFlat: cSharp,
-      // dNatural is itself
-      dSharp: eFlat,
-      eFlat: dSharp,
-      eNatural: fFlat,
-      eSharp: fNatural,
-      fFlat: eNatural,
-      fNatural: eSharp,
-      fSharp: gFlat,
-      // gNatural is itself
-      gSharp: aFlat,
+  // List<PitchClass> get spellings {
+  //   return values.where((pitchClass) => pitchClass == this);
+  // }
+
+  static PitchClass fromSpelling(PitchSpelling spelling) {
+    final spellingToPitchClass = {
+      PitchSpelling.cDoubleFlat: cDoubleFlat,
+      PitchSpelling.cFlat: cFlat,
+      PitchSpelling.cNatural: cNatural,
+      PitchSpelling.cSharp: cSharp,
+      PitchSpelling.cDoubleSharp: cDoubleSharp,
+      PitchSpelling.dDoubleFlat: dDoubleFlat,
+      PitchSpelling.dFlat: dFlat,
+      PitchSpelling.dNatural: dNatural,
+      PitchSpelling.dSharp: dSharp,
+      PitchSpelling.dDoubleSharp: dDoubleSharp,
+      PitchSpelling.eDoubleFlat: eDoubleFlat,
+      PitchSpelling.eFlat: eFlat,
+      PitchSpelling.eNatural: eNatural,
+      PitchSpelling.eSharp: eSharp,
+      PitchSpelling.eDoubleSharp: eDoubleSharp,
+      PitchSpelling.fDoubleFlat: fDoubleFlat,
+      PitchSpelling.fFlat: fFlat,
+      PitchSpelling.fNatural: fNatural,
+      PitchSpelling.fSharp: fSharp,
+      PitchSpelling.fDoubleSharp: fDoubleSharp,
+      PitchSpelling.gDoubleFlat: gDoubleFlat,
+      PitchSpelling.gFlat: gFlat,
+      PitchSpelling.gNatural: gNatural,
+      PitchSpelling.gSharp: gSharp,
+      PitchSpelling.gDoubleSharp: gDoubleSharp,
+      PitchSpelling.aDoubleFlat: aDoubleFlat,
+      PitchSpelling.aFlat: aFlat,
+      PitchSpelling.aNatural: aNatural,
+      PitchSpelling.aSharp: aSharp,
+      PitchSpelling.aDoubleSharp: aDoubleSharp,
+      PitchSpelling.bDoubleFlat: bDoubleFlat,
+      PitchSpelling.bFlat: bFlat,
+      PitchSpelling.bNatural: bNatural,
+      PitchSpelling.bSharp: bSharp,
+      PitchSpelling.bDoubleSharp: bDoubleSharp,
     };
-    return enharmonicNotes[this] ?? this;
+
+    return spellingToPitchClass[spelling];
   }
 
-  PitchClass operator +(Interval interval) {}
+  List<PitchSpelling> toSpellings() => PitchSpelling.fromPitchClass(this);
 
-  PitchClass operator -(Interval interval) {}
+  // TODO: is this accurate enough when bb or * are involved?
+  // should probably kill this in favor of alternateSpellings
+  // and use a pitch spelling algorithm instead.
+  // PitchClass enharmonicEquivalent() {
+  //   final enharmonicNotes = {
+  //     aFlat: gSharp,
+  //     // aNatural is itself
+  //     aSharp: bFlat,
+  //     bFlat: aSharp,
+  //     bNatural: cFlat,
+  //     bSharp: cNatural,
+  //     cFlat: bNatural,
+  //     cNatural: bSharp,
+  //     cSharp: dFlat,
+  //     dFlat: cSharp,
+  //     // dNatural is itself
+  //     dSharp: eFlat,
+  //     eFlat: dSharp,
+  //     eNatural: fFlat,
+  //     eSharp: fNatural,
+  //     fFlat: eNatural,
+  //     fNatural: eSharp,
+  //     fSharp: gFlat,
+  //     // gNatural is itself
+  //     gSharp: aFlat,
+  //   };
+  //   return enharmonicNotes[this] ?? this;
+  // }
+
+  PitchClass operator +(Interval interval) {
+    var currentIndex = values.indexOf(this);
+    var additionalSemitones = interval.toSemitones();
+    var totalNotesCount = 12;
+    var newNoteIndex = (currentIndex + additionalSemitones) % totalNotesCount;
+    // G# + M7 = F*
+
+    return values.elementAt(newNoteIndex);
+  }
+
+  PitchClass operator -(Interval interval) {
+    var currentIndex = values.indexOf(this);
+    var additionalSemitones = interval.toSemitones();
+    var totalNotesCount = 12;
+    var newNoteIndex =
+        (currentIndex - additionalSemitones).abs() % totalNotesCount;
+
+    return values.elementAt(newNoteIndex);
+  }
+
+  int compareTo(PitchClass other) {
+    if (setNumber > other.setNumber) return 1;
+    if (setNumber < other.setNumber) return -1;
+    return 0;
+  }
 }

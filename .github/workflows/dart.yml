@@ -1,0 +1,22 @@
+name: Dart CI
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: google/dart
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: pub get
+      - name: Run tests
+        # TODO: run test coverage report - what to do with the output? set threshold errors?
+        run: pub run test
+      # TODO: publish to pub.dev when merged to master
+      # and bump version / tag repo automatically
+      # - name: Publish
+      #   run: pub publish

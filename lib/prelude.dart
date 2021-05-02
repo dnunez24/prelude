@@ -1,6 +1,5 @@
-/// Support for doing something awesome.
-///
-/// More dartdocs go here.
+/// Biased torward Western musical tradition, including
+/// equal temperment and metrical rhythm.
 library prelude;
 
 export 'src/pitch.dart';
