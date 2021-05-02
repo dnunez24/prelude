@@ -38,8 +38,8 @@ extension ListMath<T extends num> on List<T> {
   /// var withNegatives = [-2, -1, 0, 1, 2];
   /// assert(withNegatives.sum(), 0);
   /// ```
-  T sum() => this.reduce((a, b) => a + b);
+  T sum() => reduce((total, n) => (total + n) as T);
 
   /// Computes the product of all numbers in this [List].
-  T product() => this.reduce((a, b) => a * b);
+  T product() => reduce((total, n) => (total * n) as T);
 }
